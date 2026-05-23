@@ -17,6 +17,7 @@
             background: #0a0814;
             font-family: 'Courier New', monospace;
             color: #f0f0ff;
+            touch-action: none;
         }
         body {
             display: flex;
@@ -24,9 +25,9 @@
             align-items: center;
         }
         canvas {
-            border: 3px solid #00ffc8;
-            box-shadow: 0 0 20px rgba(0, 255, 200, 0.5);
             display: block;
+            width: 100%;
+            height: 100%;
             max-width: 100vw;
             max-height: 100vh;
         }
@@ -51,19 +52,18 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         
-        // Responsive canvas sizing
+        // Set canvas to match screen size
         function resizeCanvas() {
-            const dpr = window.devicePixelRatio || 1;
-            canvas.width = window.innerWidth * dpr;
-            canvas.height = window.innerHeight * dpr;
-            ctx.scale(dpr, dpr);
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
         }
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('orientationchange', resizeCanvas);
         
-        // Get actual screen dimensions
-        const SCREEN_WIDTH = window.innerWidth;
-        const SCREEN_HEIGHT = window.innerHeight;
+        // Get screen dimensions
+        let SCREEN_WIDTH = canvas.width;
+        let SCREEN_HEIGHT = canvas.height;
         
         // Hide loading text
         document.getElementById('loadingText').style.display = 'none';
@@ -108,10 +108,10 @@
         let laserCooldownTimer = 0.0;
         let gameOver = false;
 
-        // Joystick
-        const JOYSTICK_CENTER = { x: 120, y: SCREEN_HEIGHT - 120 };
-        const JOYSTICK_BASE_RADIUS = 60;
-        const JOYSTICK_KNOB_RADIUS = 25;
+        // Joystick - positioned at bottom left
+        const JOYSTICK_CENTER = { x: 100, y: SCREEN_HEIGHT - 100 };
+        const JOYSTICK_BASE_RADIUS = 50;
+        const JOYSTICK_KNOB_RADIUS = 20;
         let joystickKnobPos = { x: JOYSTICK_CENTER.x, y: JOYSTICK_CENTER.y };
         let joystickActive = false;
         let joystickVector = { x: 0, y: 0 };
@@ -140,10 +140,11 @@
 
         // Mouse/Touch event handlers
         canvas.addEventListener('mousedown', (e) => {
+            e.preventDefault();
             const rect = canvas.getBoundingClientRect();
             const mousePos = {
-                x: e.clientX - rect.left,
-                y: e.clientY - rect.top
+                x: (e.clientX - rect.left) * (canvas.width / rect.width),
+                y: (e.clientY - rect.top) * (canvas.height / rect.height)
             };
 
             if (gameOver) {
@@ -167,11 +168,12 @@
 
         canvas.addEventListener('mousemove', (e) => {
             if (!joystickActive) return;
+            e.preventDefault();
 
             const rect = canvas.getBoundingClientRect();
             const motionPos = {
-                x: e.clientX - rect.left,
-                y: e.clientY - rect.top
+                x: (e.clientX - rect.left) * (canvas.width / rect.width),
+                y: (e.clientY - rect.top) * (canvas.height / rect.height)
             };
 
             const dx = motionPos.x - JOYSTICK_CENTER.x;
@@ -197,11 +199,12 @@
 
         // Touch events
         canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
             const rect = canvas.getBoundingClientRect();
             const touch = e.touches[0];
             const touchPos = {
-                x: touch.clientX - rect.left,
-                y: touch.clientY - rect.top
+                x: (touch.clientX - rect.left) * (canvas.width / rect.width),
+                y: (touch.clientY - rect.top) * (canvas.height / rect.height)
             };
 
             if (gameOver) {
@@ -215,22 +218,24 @@
                     joystickActive = true;
                 }
             }
-        });
+        }, { passive: false });
 
-        canvas.addEventListener('touchend', () => {
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
             joystickActive = false;
             joystickKnobPos = { ...JOYSTICK_CENTER };
             joystickVector = { x: 0, y: 0 };
-        });
+        }, { passive: false });
 
         canvas.addEventListener('touchmove', (e) => {
             if (!joystickActive) return;
+            e.preventDefault();
 
             const rect = canvas.getBoundingClientRect();
             const touch = e.touches[0];
             const motionPos = {
-                x: touch.clientX - rect.left,
-                y: touch.clientY - rect.top
+                x: (touch.clientX - rect.left) * (canvas.width / rect.width),
+                y: (touch.clientY - rect.top) * (canvas.height / rect.height)
             };
 
             const dx = motionPos.x - JOYSTICK_CENTER.x;
@@ -252,7 +257,7 @@
                     y: JOYSTICK_CENTER.y + (dy / distance) * clampDist
                 };
             }
-        });
+        }, { passive: false });
 
         function resetGame() {
             playerX = 100;
@@ -424,35 +429,35 @@
 
             // Text
             ctx.fillStyle = COLOR_TEXT;
-            ctx.font = 'bold 18px "Courier New"';
+            ctx.font = 'bold 14px "Courier New"';
             ctx.textAlign = 'left';
-            ctx.fillText(`SCORE: ${coreScore}`, 25, 30);
+            ctx.fillText(`SCORE: ${coreScore}`, 15, 30);
 
             const currentKillRate = survivalTime > 1.0 ? (kills / survivalTime) * 60.0 : 0.0;
             ctx.fillStyle = COLOR_METRIC;
-            ctx.fillText(`KILL RATE: ${currentKillRate.toFixed(1)}/MIN`, 290, 30);
+            ctx.fillText(`KILL RATE: ${currentKillRate.toFixed(1)}/MIN`, SCREEN_WIDTH / 3, 30);
 
             ctx.fillStyle = COLOR_LASER;
-            ctx.fillText(`BEST RATE: ${bestKillRate.toFixed(1)}/MIN`, 610, 30);
+            ctx.fillText(`BEST: ${bestKillRate.toFixed(1)}/MIN`, (SCREEN_WIDTH * 2) / 3, 30);
         }
 
         function drawGameOver() {
             ctx.fillStyle = COLOR_ENEMY;
-            ctx.font = 'bold 38px "Courier New"';
+            ctx.font = 'bold 28px "Courier New"';
             ctx.textAlign = 'center';
-            ctx.fillText('ROCKET HULL DESTROYED', SCREEN_WIDTH / 2, 160);
+            ctx.fillText('ROCKET HULL DESTROYED', SCREEN_WIDTH / 2, SCREEN_HEIGHT / 3);
 
             ctx.fillStyle = COLOR_TEXT;
-            ctx.font = 'bold 18px "Courier New"';
-            ctx.fillText(`TOTAL THREAT SCORE ELIMINATED: ${coreScore}`, SCREEN_WIDTH / 2, 240);
+            ctx.font = 'bold 14px "Courier New"';
+            ctx.fillText(`SCORE: ${coreScore}`, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
 
             const peakRate = survivalTime > 1.0 ? (kills / survivalTime) * 60.0 : 0.0;
             ctx.fillStyle = COLOR_METRIC;
-            ctx.fillText(`PEAK EFFICIENCY RECORD SECURED: ${peakRate.toFixed(1)} KILLS/MIN`, SCREEN_WIDTH / 2, 280);
+            ctx.fillText(`PEAK: ${peakRate.toFixed(1)} KILLS/MIN`, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 40);
 
             ctx.fillStyle = COLOR_PLAYER;
-            ctx.font = 'bold 38px "Courier New"';
-            ctx.fillText('[ TAP / CLICK SCREEN TO RESPAWN ]', SCREEN_WIDTH / 2, 400);
+            ctx.font = 'bold 16px "Courier New"';
+            ctx.fillText('[ TAP TO RESPAWN ]', SCREEN_WIDTH / 2, SCREEN_HEIGHT - 50);
         }
 
         let lastTime = Date.now();
@@ -461,6 +466,10 @@
             const now = Date.now();
             const dt = (now - lastTime) / 1000;
             lastTime = now;
+
+            // Update screen dimensions if window resized
+            SCREEN_WIDTH = canvas.width;
+            SCREEN_HEIGHT = canvas.height;
 
             // Update
             if (!gameOver) {
